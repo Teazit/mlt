@@ -330,7 +330,17 @@ static int get_image_a( mlt_frame a_frame, uint8_t **image, mlt_image_format *fo
 
 	// All transitions get scaling
 	const char *rescale = mlt_properties_get( a_props, "rescale.interp" );
-	if ( !rescale || !strcmp( rescale, "none" ) )
+	//if ( !rescale || !strcmp( rescale, "none" ) )
+	/*
+	mpicard: In our API, when we use transition, we don't want to use any
+	rescale from mlt, since it put horrible black pad around our video. So, we
+	set the rescale.interp to none. But since mlt always want to rescale our
+	video (which is comprehensible, imagine if we pass video with different
+	dimensions), we have to modify here to accept the none value.
+	Now it's up to us to check before going here if the videos have an
+	acceptable dimension or not.
+	*/
+	if ( !rescale )
 		mlt_properties_set( a_props, "rescale.interp", "nearest" );
 
 	// Ensure sane aspect ratio
@@ -351,7 +361,9 @@ static int get_image_b( mlt_frame b_frame, uint8_t **image, mlt_image_format *fo
 	if ( !mlt_properties_get( b_props, "rescale.interp" ) )
 	{
 		const char *rescale = mlt_properties_get( a_props, "rescale.interp" );
-		if ( !rescale || !strcmp( rescale, "none" ) )
+		// if ( !rescale || !strcmp( rescale, "none" ) )
+		// mpicard: See comment at line 334.
+		if ( !rescale )
 			rescale = "nearest";
 		mlt_properties_set( b_props, "rescale.interp", rescale );
 	}
