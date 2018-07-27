@@ -107,3 +107,7 @@ bool Switcher::locate_cut(Producer* producer, int &track, int &cut){
 int Switcher::connect(Producer &producer){
     return mlt_switcher_connect(get_switcher(), producer.get_service());
 }
+
+void Switcher::set_current_track(int index){
+    mlt_switcher_set_current_track(get_switcher(), index);
+}

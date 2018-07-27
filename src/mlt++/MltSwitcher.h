@@ -33,10 +33,8 @@ namespace Mlt{
 			Producer *track( int index );
 			int count( );
 			bool locate_cut( Producer *producer, int &track, int &cut );
-			int connect( Producer &producer );;
-
-			/* TODO : Add method relative to the switch
-            */
+			int connect( Producer &producer );
+			void set_current_track(int index);
     };
 }
 
