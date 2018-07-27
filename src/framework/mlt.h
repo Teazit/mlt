@@ -59,6 +59,10 @@ extern "C"
 #include "mlt_version.h"
 #include "mlt_slices.h"
 
+/* Adding the new mlt_switcher class
+*/
+#include "mlt_switcher.h"
+
 #ifdef __cplusplus
 }
 #endif

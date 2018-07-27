@@ -44,4 +44,8 @@
 #include "MltTractor.h"
 #include "MltTransition.h"
 
+/* Adding the new mlt_switcher class
+*/
+#include "MltSwitcher.h"
+
 #endif

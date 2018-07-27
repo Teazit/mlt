@@ -143,7 +143,8 @@ typedef enum
 	filter_type,                /**< Filter class */
 	transition_type,            /**< Transition class */
 	consumer_type,              /**< Consumer class */
-	field_type                  /**< Field class */
+	field_type,                 /**< Field class */
+	switcher_type               /**< Switcher class */
 }
 mlt_service_type;
 
@@ -190,6 +191,7 @@ typedef struct mlt_multitrack_s *mlt_multitrack;        /**< pointer to Multitra
 typedef struct mlt_filter_s *mlt_filter;                /**< pointer to Filter object */
 typedef struct mlt_transition_s *mlt_transition;        /**< pointer to Transition object */
 typedef struct mlt_tractor_s *mlt_tractor;              /**< pointer to Tractor object */
+typedef struct mlt_switcher_s *mlt_switcher:            /**< pointer to Switcher object */
 typedef struct mlt_field_s *mlt_field;                  /**< pointer to Field object */
 typedef struct mlt_consumer_s *mlt_consumer;            /**< pointer to Consumer object */
 typedef struct mlt_parser_s *mlt_parser;                /**< pointer to Properties object */

@@ -65,6 +65,11 @@ namespace Mlt {
 %newobject Properties::get_anim();
 %newobject Animation::Animation();
 
+/* Adding the new mlt_switcher class
+*/
+%newobject Switcher::multitrack();
+%newobject Switcher::track(int);
+
 #if defined(SWIGPYTHON)
 %feature("shadow") Frame::get_waveform(int, int) %{
     def get_waveform(*args): return _mlt.frame_get_waveform(*args)
@@ -104,6 +109,9 @@ void mlt_log_set_level( int );
 %include <MltFilteredConsumer.h>
 %include <MltAnimation.h>
 
+/* Adding the new mlt_switcher class
+*/
+%include <MltSwitcher.h>
 
 
 #if defined(SWIGRUBY)

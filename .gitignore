@@ -33,4 +33,4 @@ make.inc
 src/examples/play
 *.dot
 *.rej
-
+.idea
