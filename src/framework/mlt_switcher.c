@@ -119,7 +119,7 @@ mlt_switcher mlt_switcher_new( )
  * \see MLT_SWITCHER_SERVICE
  */
 
-mlt_service mlt_switcher_service( mlt_tractor self )
+mlt_service mlt_switcher_service( mlt_switcher self )
 {
 	return MLT_PRODUCER_SERVICE( &self->parent );
 }
@@ -185,7 +185,7 @@ void mlt_switcher_refresh( mlt_switcher self )
 
 /* The listener to changes made to the internal multitrack.
 */
-static void mlt_switcher_listener( mlt_multitrack tracks, mlt_tractor self )
+static void mlt_switcher_listener( mlt_multitrack tracks, mlt_switcher self )
 {
 	mlt_switcher_refresh( self );
 }
@@ -302,7 +302,7 @@ static int producer_get_frame( mlt_producer parent, mlt_frame_ptr frame, int tra
 
     // We only respond to the first track requests
     if(track == 0 && self->producer != NULL){
-        // Try to obtain the multitrack associated to the tractor
+        // Try to obtain the multitrack associated to the switcher
 		// Or a specific producer
 		mlt_producer producer = mlt_properties_get_data( properties, "producer", NULL );
 
@@ -344,7 +344,7 @@ static int producer_get_frame( mlt_producer parent, mlt_frame_ptr frame, int tra
  */
 
 void mlt_switcher_close( mlt_switcher self ){
-    if(self != NULL && mlt_properties_dec_ref( MLT_TRACTOR_PROPERTIES( self ) ) <= 0){
+    if(self != NULL && mlt_properties_dec_ref( MLT_SWITCHER_PROPERTIES( self ) ) <= 0){
         self->parent.close = NULL;
 		mlt_producer_close( &self->parent );
 		free( self );
