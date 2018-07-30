@@ -61,6 +61,12 @@ mlt_multitrack mlt_multitrack_init( )
 			mlt_properties_set_int( properties, "out", -1 );
 			mlt_properties_set_int( properties, "length", 0 );
 			producer->close = ( mlt_destructor )mlt_multitrack_close;
+
+            // BAD WAY to switch between track
+			mlt_properties_set_int( properties, "_offset", 0);
+			mlt_properties_set_int( properties, "auto_rotate", 0);
+			mlt_properties_set_int( properties, "_frame_count_rotate", 0);
+			mlt_properties_set_int( properties, "frame_max_rotate", 30);
 		}
 		else
 		{
@@ -590,8 +596,11 @@ static int producer_get_frame( mlt_producer parent, mlt_frame_ptr frame, int ind
 	// Check if we have a track for this index
 	if ( index >= 0 && index < self->count && self->list[ index ] != NULL )
 	{
+	    // BAD WAY to rotate
+	    int rotated_index = (index + mlt_properties_get_int(MLT_MULTITRACK_PROPERTIES(self), "_offset")) % self->count;
+
 		// Get the producer for this track
-		mlt_producer producer = self->list[ index ]->producer;
+		mlt_producer producer = self->list[ rotated_index ]->producer;
 
 		// Get the track hide property
 		int hide = mlt_properties_get_int( MLT_PRODUCER_PROPERTIES( mlt_producer_cut_parent( producer ) ), "hide" );
@@ -633,6 +642,19 @@ static int producer_get_frame( mlt_producer parent, mlt_frame_ptr frame, int ind
 
 			// Move to the next frame
 			mlt_producer_prepare_next( parent );
+
+			// BAD WAY to rotate
+			int frame_max_rotate = mlt_properties_get_int(MLT_MULTITRACK_PROPERTIES(self), "frame_max_rotate");
+			int _frame_count_rotate = mlt_properties_get_int(MLT_MULTITRACK_PROPERTIES(self), "_frame_count_rotate");
+			int _offset = mlt_properties_get_int(MLT_MULTITRACK_PROPERTIES(self), "_offset");
+			++_frame_count_rotate;
+			if(_frame_count_rotate >= frame_max_rotate){
+			    _frame_count_rotate = 0;
+			    if(mlt_properties_get_int(MLT_MULTITRACK_PROPERTIES(self), "auto_rotate"))
+			        ++ _offset;
+			}
+			mlt_properties_set_int(MLT_MULTITRACK_PROPERTIES(self), "_frame_count_rotate", _frame_count_rotate);
+			mlt_properties_set_int(MLT_MULTITRACK_PROPERTIES(self), "_offset", _offset);
 		}
 	}
 
