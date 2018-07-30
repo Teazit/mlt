@@ -217,6 +217,7 @@ typedef char *( *mlt_serialiser )( void *, int length );/**< pointer to serializ
 #define MLT_TRANSITION(x) ( ( mlt_transition )( x ) )   /**< Cast to a Transition pointer */
 #define MLT_CONSUMER(x) ( ( mlt_consumer )( x ) )       /**< Cast to a Consumer pointer */
 #define MLT_FRAME(x)      ( ( mlt_frame )( x ) )        /**< Cast to a Frame pointer */
+#define MLT_SWITCHER(x) ( ( mlt_switcher ) ( x ))       /**< Cast to a Switcher pointer */
 
 #ifndef MIN
 #define MIN(x, y) ((x) < (y) ? (x) : (y))
