@@ -263,7 +263,7 @@ mlt_producer mlt_switcher_get_track( mlt_switcher self, int index )
 
 /** Get the next frame.
  *
- * TODO : Write it.
+ * TODO : Fix it.
  *
  * \private \memberof mlt_switcher_s
  * \param parent the producer interface to the switcher
@@ -308,16 +308,7 @@ static int producer_get_frame( mlt_producer parent, mlt_frame_ptr frame, int tra
 		mlt_producer producer = mlt_properties_get_data( switcher_properties, "producer", NULL );
 
         if(multitrack != NULL){
-
-            // Is it correct?
-            mlt_producer target = MLT_MULTITRACK_PRODUCER( multitrack );
-            mlt_producer_seek( target, mlt_producer_frame( parent ) );
-			mlt_producer_set_speed( target, mlt_producer_get_speed( parent ) );
-
-			mlt_service_get_frame( self->producer, frame, current_track );
-			if(mlt_properties_get_int( mlt_frame_properties(*frame), "last_track" ) == 0)
-			    mlt_producer_prepare_next(target);
-
+            mlt_service_get_frame( self->producer, frame, track );
         }else if(producer != NULL){
             mlt_producer_seek( producer, mlt_producer_frame( parent ) );
 			mlt_producer_set_speed( producer, mlt_producer_get_speed( parent ) );
