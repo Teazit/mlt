@@ -25,18 +25,18 @@ Switcher::Switcher( mlt_switcher switcher ):
 }
 
 Switcher::Switcher( Switcher &switcher ):
-    MLT::Producer(switcher),
+    Mlt::Producer(switcher),
     instance(switcher.get_switcher()){
         inc_ref();
 }
 
-Switcher::Switcher( Profile& profile, char *id, char *arg = NULL ):
+Switcher::Switcher( Profile& profile, char *id, char *arg):
     instance(NULL){
         Producer producer(profile, id, arg);
-        if(profile.is_valid() && producer.type() == switcher_type){
+        if(producer.is_valid() && producer.type() == switcher_type){
             instance = (mlt_switcher)producer.get_producer();
             inc_ref();
-        }else if(profile.is_valid()){
+        }else if(producer.is_valid()){
             instance = mlt_switcher_new( );
 		    set_profile( profile );
 		    set_track( producer, 0 );
@@ -72,7 +72,7 @@ int Switcher::insert_track(Producer& producer, int index){
 }
 
 int Switcher::remove_track(int index){
-    return mlt_switcher_remove_track(get_switcher(), producer.get_switcher(), index);
+    return mlt_switcher_remove_track(get_switcher(), index);
 }
 
 Producer* Switcher::track(int index){

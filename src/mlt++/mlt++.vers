@@ -546,3 +546,27 @@ MLTPP_6.10.0 {
       "Mlt::Animation::serialize_cut(mlt_time_format, int, int)";
   };
 } MLTPP_6.8.0;
+
+MLTPP_6.10.1 {
+  global:
+    extern "C++" {
+      "Mlt::Switcher::Switcher()";
+      "Mlt::Switcher::Switcher(Profile&)";
+      "Mlt::Switcher::Switcher(Service&)";
+      "Mlt::Switcher::Switcher(Switcher&)";
+      "Mlt::Switcher::Switcher(Profile&, char*, char*)";
+      "Mlt::Switcher::~Switcher()";
+      "Mlt::Switcher::get_switcher()";
+      "Mlt::Switcher::get_producer()";
+      "Mlt::Switcher::multitrack()";
+      "Mlt::Switcher::refresh()";
+      "Mlt::Switcher::set_track(Producer&, int)";
+      "Mlt::Switcher::insert_track(Producer&, int)";
+      "Mlt::Switcher::remove_track(int)";
+      "Mlt::Switcher::track(int)";
+      "Mlt::Switcher::count()";
+      "Mlt::Switcher::locate_cut(Producer*, int&, int&)";
+      "Mlt::Switcher::connect(Producer&)";
+      "Mlt::Switcher::set_current_track(int)";
+  };
+} MLTPP_6.10.0;

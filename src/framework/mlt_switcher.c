@@ -47,7 +47,7 @@ mlt_switcher mlt_switcher_init( )
             mlt_properties_set_int(properties, "auto_switch", DEFAULT_AUTO_SWITCH);
 		    mlt_properties_set_int(properties, "nb_frame_switch", DEFAULT_NB_FRAME_SWITCH);
 		    mlt_properties_set_int(properties, "current_track", 0);
-		    mlt_producer_set_int(properties, "_frame_count", 0);
+		    mlt_properties_set_int(properties, "_frame_count", 0);
 
 			producer->get_frame = producer_get_frame;
 			producer->close = ( mlt_destructor )mlt_switcher_close;
@@ -96,7 +96,7 @@ mlt_switcher mlt_switcher_new( )
             mlt_properties_set_int(properties, "auto_switch", DEFAULT_AUTO_SWITCH);
 		    mlt_properties_set_int(properties, "nb_frame_switch", DEFAULT_NB_FRAME_SWITCH);
 		    mlt_properties_set_int(properties, "current_track", 0);
-		    mlt_producer_set_int(properties, "_frame_count", 0);
+		    mlt_properties_set_int(properties, "_frame_count", 0);
 
 			producer->get_frame = producer_get_frame;
 			producer->close = ( mlt_destructor )mlt_switcher_close;
@@ -275,11 +275,12 @@ mlt_producer mlt_switcher_get_track( mlt_switcher self, int index )
 static int producer_get_frame( mlt_producer parent, mlt_frame_ptr frame, int track ){
     mlt_switcher self = parent->child;
 
-    // Try to obtain the multitrack associated to the switcher
-    mlt_multitrack multitrack = mlt_properties_get_data( properties, "multitrack", NULL );
-
     mlt_properties switcher_properties = mlt_switcher_properties(self);
-    // No concurrent access to our properties when we get a frame
+
+    // Try to obtain the multitrack associated to the switcher
+    mlt_multitrack multitrack = mlt_properties_get_data( switcher_properties, "multitrack", NULL );
+
+    // No concurrent access to our properties switcher when we get a frame
     mlt_properties_lock(switcher_properties);
     int frame_count = mlt_properties_get_int(switcher_properties, "_frame_count");
     int nb_frame_switch = mlt_properties_get_int(switcher_properties, "nb_frame_switch");
@@ -304,7 +305,7 @@ static int producer_get_frame( mlt_producer parent, mlt_frame_ptr frame, int tra
     if(track == 0 && self->producer != NULL){
         // Try to obtain the multitrack associated to the switcher
 		// Or a specific producer
-		mlt_producer producer = mlt_properties_get_data( properties, "producer", NULL );
+		mlt_producer producer = mlt_properties_get_data( switcher_properties, "producer", NULL );
 
         if(multitrack != NULL){
 
@@ -314,7 +315,7 @@ static int producer_get_frame( mlt_producer parent, mlt_frame_ptr frame, int tra
 			mlt_producer_set_speed( target, mlt_producer_get_speed( parent ) );
 
 			mlt_service_get_frame( self->producer, frame, current_track );
-			if(mlt_properties_get_int( temp_properties, "last_track" ) == 0)
+			if(mlt_properties_get_int( mlt_frame_properties(*frame), "last_track" ) == 0)
 			    mlt_producer_prepare_next(target);
 
         }else if(producer != NULL){
