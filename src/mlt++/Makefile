@@ -48,7 +48,8 @@ OBJS = MltAnimation.o \
 	   MltService.o \
 	   MltTokeniser.o \
 	   MltTractor.o \
-	   MltTransition.o
+	   MltTransition.o \
+	   MltSwitcher.o
 
 SRCS = $(OBJS:.o=.cpp)
 HEADERS = MltConfig.h Mlt.h $(OBJS:.o=.h)
