@@ -261,6 +261,96 @@ mlt_producer mlt_switcher_get_track( mlt_switcher self, int index )
 	return mlt_multitrack_track( mlt_switcher_multitrack( self ), index );
 }
 
+static int producer_get_image( mlt_frame self, uint8_t **buffer, mlt_image_format *format, int *width, int *height, int writable )
+{
+	uint8_t *data = NULL;
+	int size = 0;
+	mlt_properties properties = MLT_FRAME_PROPERTIES( self );
+	mlt_frame frame = mlt_frame_pop_service( self );
+	mlt_properties frame_properties = MLT_FRAME_PROPERTIES( frame );
+	mlt_properties_set( frame_properties, "rescale.interp", mlt_properties_get( properties, "rescale.interp" ) );
+	mlt_properties_set_int( frame_properties, "resize_alpha", mlt_properties_get_int( properties, "resize_alpha" ) );
+	mlt_properties_set_int( frame_properties, "distort", mlt_properties_get_int( properties, "distort" ) );
+	mlt_properties_set_int( frame_properties, "consumer_deinterlace", mlt_properties_get_int( properties, "consumer_deinterlace" ) );
+	mlt_properties_set( frame_properties, "deinterlace_method", mlt_properties_get( properties, "deinterlace_method" ) );
+	mlt_properties_set_int( frame_properties, "consumer_tff", mlt_properties_get_int( properties, "consumer_tff" ) );
+	mlt_properties_set( frame_properties, "consumer_color_trc", mlt_properties_get( properties, "consumer_color_trc" ) );
+	// WebVfx uses this to setup a consumer-stopping event handler.
+	mlt_properties_set_data( frame_properties, "consumer", mlt_properties_get_data( properties, "consumer", NULL ), 0, NULL, NULL );
+
+	mlt_frame_get_image( frame, buffer, format, width, height, writable );
+	mlt_frame_set_image( self, *buffer, 0, NULL );
+
+	mlt_properties_set_int( properties, "width", *width );
+	mlt_properties_set_int( properties, "height", *height );
+	mlt_properties_set_int( properties, "format", *format );
+	mlt_properties_set_double( properties, "aspect_ratio", mlt_frame_get_aspect_ratio( frame ) );
+	mlt_properties_set_int( properties, "progressive", mlt_properties_get_int( frame_properties, "progressive" ) );
+	mlt_properties_set_int( properties, "distort", mlt_properties_get_int( frame_properties, "distort" ) );
+	mlt_properties_set_int( properties, "colorspace", mlt_properties_get_int( frame_properties, "colorspace" ) );
+	mlt_properties_set_int( properties, "force_full_luma", mlt_properties_get_int( frame_properties, "force_full_luma" ) );
+	mlt_properties_set_int( properties, "top_field_first", mlt_properties_get_int( frame_properties, "top_field_first" ) );
+	mlt_properties_set( properties, "color_trc", mlt_properties_get( frame_properties, "color_trc" ) );
+	mlt_properties_set_data( properties, "movit.convert.fence",
+		mlt_properties_get_data( frame_properties, "movit.convert.fence", NULL ),
+		0, NULL, NULL );
+	mlt_properties_set_data( properties, "movit.convert.texture",
+		mlt_properties_get_data( frame_properties, "movit.convert.texture", NULL ),
+		0, NULL, NULL );
+	mlt_properties_set_int( properties, "movit.convert.use_texture", mlt_properties_get_int( frame_properties, "movit.convert.use_texture" ) );
+	int i;
+	for ( i = 0; i < mlt_properties_count( frame_properties ); i++ )
+	{
+		char *name = mlt_properties_get_name( frame_properties, i );
+		if ( name && !strncmp( name, "_movit ", 7 ) ) {
+			mlt_properties_set_data( properties, name,
+				mlt_properties_get_data_at( frame_properties, i, NULL ),
+				0, NULL, NULL );
+		}
+	}
+
+	data = mlt_frame_get_alpha( frame );
+	if ( data )
+	{
+		mlt_properties_get_data( frame_properties, "alpha", &size );
+		mlt_frame_set_alpha( self, data, size, NULL );
+	};
+	self->convert_image = frame->convert_image;
+	self->convert_audio = frame->convert_audio;
+	return 0;
+}
+
+static int producer_get_audio( mlt_frame self, void **buffer, mlt_audio_format *format, int *frequency, int *channels, int *samples )
+{
+	mlt_properties properties = MLT_FRAME_PROPERTIES( self );
+	mlt_frame frame = mlt_frame_pop_audio( self );
+	mlt_properties frame_properties = MLT_FRAME_PROPERTIES( frame );
+	mlt_properties_set( frame_properties, "consumer_channel_layout", mlt_properties_get( properties, "consumer_channel_layout" ) );
+	mlt_properties_set( frame_properties, "producer_consumer_fps", mlt_properties_get( properties, "producer_consumer_fps" ) );
+	mlt_frame_get_audio( frame, buffer, format, frequency, channels, samples );
+	mlt_frame_set_audio( self, *buffer, *format, mlt_audio_format_size( *format, *samples, *channels ), NULL );
+	mlt_properties_set_int( properties, "audio_frequency", *frequency );
+	mlt_properties_set_int( properties, "audio_channels", *channels );
+	mlt_properties_set_int( properties, "audio_samples", *samples );
+	return 0;
+}
+
+static void destroy_data_queue( void *arg )
+{
+	if ( arg != NULL )
+	{
+		// Assign the correct type
+		mlt_deque queue = arg;
+
+		// Iterate through each item and destroy them
+		while ( mlt_deque_peek_front( queue ) != NULL )
+			mlt_properties_close( mlt_deque_pop_back( queue ) );
+
+		// Close the deque
+		mlt_deque_close( queue );
+	}
+}
+
 /** Get the next frame.
  *
  * TODO : Fix it.
@@ -308,7 +398,180 @@ static int producer_get_frame( mlt_producer parent, mlt_frame_ptr frame, int tra
 		mlt_producer producer = mlt_properties_get_data( switcher_properties, "producer", NULL );
 
         if(multitrack != NULL){
-            mlt_service_get_frame( self->producer, frame, track );
+            mlt_frame temp = NULL;
+            int done = 0, count = 0, image_count = 0, rotated_index = 0;
+
+            // Determine whether this switcher feeds to the consumer or stops here
+		    int global_feed = mlt_properties_get_int( switcher_properties, "global_feed" );
+
+		    // The output frame will hold the 'global' data feeds (ie: those which are targetted for the final frame)
+			mlt_deque data_queue = mlt_deque_init( );
+
+			// Used to garbage collect all frames
+			char label[64];
+
+			// Get the id of the tractor
+			char *id = mlt_properties_get( switcher_properties, "_unique_id" );
+			if ( !id ) {
+				mlt_properties_set_int64( switcher_properties, "_unique_id", (int64_t) switcher_properties );
+				id = mlt_properties_get( switcher_properties, "_unique_id" );
+			}
+
+			// Will be used to store the frame properties object
+			mlt_properties frame_properties = NULL;
+
+			// We'll store audio and video frames to use here
+			mlt_frame audio = NULL;
+			mlt_frame video = NULL;
+			mlt_frame first_video = NULL;
+
+			// Temporary properties
+			mlt_properties temp_properties = NULL;
+
+			// Get the multitrack's producer
+			mlt_producer target = MLT_MULTITRACK_PRODUCER( multitrack );
+			mlt_producer_seek( target, mlt_producer_frame( parent ) );
+			mlt_producer_set_speed( target, mlt_producer_get_speed( parent ) );
+
+			// We will create one frame and attach everything to it
+			*frame = mlt_frame_init( MLT_PRODUCER_SERVICE( parent ) );
+
+			// Get the properties of the frame
+			frame_properties = MLT_FRAME_PROPERTIES( *frame );
+
+			for(int multitrack_index = 0; !done; ++multitrack_index){
+			    if(multitrack_index < multitrack->count)
+			        rotated_index = (multitrack_index + current_track + 1) % multitrack->count;
+			    else
+			        rotated_index = multitrack_index;
+
+			    // Get a frame from the producer
+				mlt_service_get_frame( self->producer, &temp, rotated_index );
+
+                // Get the temporary properties
+				temp_properties = MLT_FRAME_PROPERTIES( temp );
+
+				// Pass all unique meta properties from the producer's frame to the new frame
+				mlt_properties_lock( temp_properties );
+				int props_count = mlt_properties_count( temp_properties );
+				int j;
+				for ( j = 0; j < props_count; j ++ )
+				{
+					char *name = mlt_properties_get_name( temp_properties, j );
+					if ( !strncmp( name, "meta.", 5 ) && !mlt_properties_get( frame_properties, name ) )
+						mlt_properties_set( frame_properties, name, mlt_properties_get_value( temp_properties, j ) );
+				}
+				mlt_properties_unlock( temp_properties );
+
+				// Copy the format conversion virtual functions
+				if ( ! (*frame)->convert_image && temp->convert_image )
+					(*frame)->convert_image = temp->convert_image;
+				if ( ! (*frame)->convert_audio && temp->convert_audio )
+					(*frame)->convert_audio = temp->convert_audio;
+
+				// Check for last track
+				done = mlt_properties_get_int( temp_properties, "last_track" );
+
+				// Handle fx only tracks
+				if ( mlt_properties_get_int( temp_properties, "fx_cut" ) )
+				{
+					int hide = ( video == NULL ? 1 : 0 ) | ( audio == NULL ? 2 : 0 );
+					mlt_properties_set_int( temp_properties, "hide", hide );
+				}
+
+				// We store all frames with a destructor on the output frame
+				snprintf( label, sizeof(label), "mlt_tractor %s_%d", id, count ++ );
+				mlt_properties_set_data( frame_properties, label, temp, 0, ( mlt_destructor )mlt_frame_close, NULL );
+
+				// We want to append all 'final' feeds to the global queue
+				if ( !done && mlt_properties_get_data( temp_properties, "data_queue", NULL ) != NULL )
+				{
+					// Move the contents of this queue on to the output frames data queue
+					mlt_deque sub_queue = mlt_properties_get_data( MLT_FRAME_PROPERTIES( temp ), "data_queue", NULL );
+					mlt_deque temp = mlt_deque_init( );
+					while ( global_feed && mlt_deque_count( sub_queue ) )
+					{
+						mlt_properties p = mlt_deque_pop_back( sub_queue );
+						if ( mlt_properties_get_int( p, "final" ) )
+							mlt_deque_push_back( data_queue, p );
+						else
+							mlt_deque_push_back( temp, p );
+					}
+					while( mlt_deque_count( temp ) )
+						mlt_deque_push_front( sub_queue, mlt_deque_pop_back( temp ) );
+					mlt_deque_close( temp );
+				}
+
+				// Now do the same with the global queue but without the conditional behaviour
+				if ( mlt_properties_get_data( temp_properties, "global_queue", NULL ) != NULL )
+				{
+					mlt_deque sub_queue = mlt_properties_get_data( MLT_FRAME_PROPERTIES( temp ), "global_queue", NULL );
+					while ( mlt_deque_count( sub_queue ) )
+					{
+						mlt_properties p = mlt_deque_pop_back( sub_queue );
+						mlt_deque_push_back( data_queue, p );
+					}
+				}
+
+				// Pick up first video and audio frames
+				if ( !done && !mlt_frame_is_test_audio( temp ) && !( mlt_properties_get_int( temp_properties, "hide" ) & 2 ) )
+				{
+					// Order of frame creation is starting to get problematic
+					if ( audio != NULL )
+					{
+						mlt_deque_push_front( MLT_FRAME_AUDIO_STACK( temp ), producer_get_audio );
+						mlt_deque_push_front( MLT_FRAME_AUDIO_STACK( temp ), audio );
+					}
+					audio = temp;
+				}
+				if ( !done && !mlt_frame_is_test_card( temp ) && !( mlt_properties_get_int( temp_properties, "hide" ) & 1 ) )
+				{
+					if ( video != NULL )
+					{
+						mlt_deque_push_front( MLT_FRAME_IMAGE_STACK( temp ), producer_get_image );
+						mlt_deque_push_front( MLT_FRAME_IMAGE_STACK( temp ), video );
+					}
+					video = temp;
+					if ( first_video == NULL )
+						first_video = temp;
+
+					mlt_properties_set_int( MLT_FRAME_PROPERTIES( temp ), "image_count", ++ image_count );
+					image_count = 1;
+				}
+			}
+
+			// Now stack callbacks
+			if ( audio != NULL )
+			{
+				mlt_frame_push_audio( *frame, audio );
+				mlt_frame_push_audio( *frame, producer_get_audio );
+			}
+
+			if ( video != NULL )
+			{
+				mlt_properties video_properties = MLT_FRAME_PROPERTIES( first_video );
+				mlt_frame_push_service( *frame, video );
+				mlt_frame_push_service( *frame, producer_get_image );
+				if ( global_feed )
+					mlt_properties_set_data( frame_properties, "data_queue", data_queue, 0, NULL, NULL );
+				mlt_properties_set_data( video_properties, "global_queue", data_queue, 0, destroy_data_queue, NULL );
+				mlt_properties_set_int( frame_properties, "width", mlt_properties_get_int( video_properties, "width" ) );
+				mlt_properties_set_int( frame_properties, "height", mlt_properties_get_int( video_properties, "height" ) );
+				mlt_properties_pass_list( frame_properties, video_properties, "meta.media.width, meta.media.height" );
+				mlt_properties_set_int( frame_properties, "progressive", mlt_properties_get_int( video_properties, "progressive" ) );
+				mlt_properties_set_double( frame_properties, "aspect_ratio", mlt_properties_get_double( video_properties, "aspect_ratio" ) );
+				mlt_properties_set_int( frame_properties, "image_count", image_count );
+				mlt_properties_set_data( frame_properties, "_producer", mlt_frame_get_original_producer( first_video ), 0, NULL, NULL );
+			}
+			else
+			{
+				destroy_data_queue( data_queue );
+			}
+
+			mlt_frame_set_position( *frame, mlt_producer_frame( parent ) );
+			mlt_properties_set_int( MLT_FRAME_PROPERTIES( *frame ), "test_audio", audio == NULL );
+			mlt_properties_set_int( MLT_FRAME_PROPERTIES( *frame ), "test_image", video == NULL );
+
         }else if(producer != NULL){
             mlt_producer_seek( producer, mlt_producer_frame( parent ) );
 			mlt_producer_set_speed( producer, mlt_producer_get_speed( parent ) );
